@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XML Generator</title>
+    <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <div class="container mx-auto px-4 py-8">
+        <div class="max-w-md mx-auto bg-white rounded-lg shadow-lg p-6">
+            <h1 class="text-2xl font-bold text-center mb-6">XML Generator</h1>
+            
+            <div class="mb-6">
+                <h2 class="text-lg font-semibold mb-2">Instructions:</h2>
+                <ol class="list-decimal list-inside space-y-2 text-gray-700">
+                    <li>Prepare your Excel file with the required format</li>
+                    <li>Upload your Excel file using the form below</li>
+                    <li>The generated XML will automatically download</li>
+                </ol>
+            </div>
+
+            <div class="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center" id="drop-zone">
+                <form id="upload-form" class="space-y-4">
+                    <div class="space-y-2">
+                        <label for="file-input" class="cursor-pointer">
+                            <div class="text-blue-500 hover:text-blue-600">
+                                <svg class="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                        d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                                </svg>
+                                <span class="mt-2 block">Drop your Excel file here or click to browse</span>
+                            </div>
+                        </label>
+                        <input type="file" id="file-input" name="file" accept=".xlsx,.xls" class="hidden">
+                    </div>
+                    
+                    <div id="file-info" class="hidden">
+                        <p class="text-sm text-gray-600">Selected file: <span id="file-name"></span></p>
+                        <button type="submit"
+                            class="mt-2 px-4 py-2 bg-blue-500 text-white rounded hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-50">
+                            Generate XML
+                        </button>
+                    </div>
+                </form>
+            </div>
+
+            <div id="error-message" class="hidden mt-4 p-3 bg-red-100 text-red-700 rounded"></div>
+        </div>
+    </div>
+
+    <script>
+        const form = document.getElementById('upload-form');
+        const fileInput = document.getElementById('file-input');
+        const fileInfo = document.getElementById('file-info');
+        const fileName = document.getElementById('file-name');
+        const errorMessage = document.getElementById('error-message');
+        const dropZone = document.getElementById('drop-zone');
+
+        // Handle file selection
+        fileInput.addEventListener('change', (e) => {
+            const file = e.target.files[0];
+            if (file) {
+                fileName.textContent = file.name;
+                fileInfo.classList.remove('hidden');
+                errorMessage.classList.add('hidden');
+            }
+        });
+
+        // Handle drag and drop
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-blue-500');
+        });
+
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-blue-500');
+        });
+
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-blue-500');
+            
+            const file = e.dataTransfer.files[0];
+            if (file) {
+                fileInput.files = e.dataTransfer.files;
+                fileName.textContent = file.name;
+                fileInfo.classList.remove('hidden');
+                errorMessage.classList.add('hidden');
+            }
+        });
+
+        // Handle form submission
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                const response = await fetch('/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+
+                if (response.ok) {
+                    // Get the filename from the Content-Disposition header
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    const filename = contentDisposition
+                        ? contentDisposition.split('filename=')[1].replace(/"/g, '')
+                        : 'generated.xml';
+
+                    // Create a blob from the response
+                    const blob = await response.blob();
+                    
+                    // Create a download link and click it
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = filename;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    a.remove();
+
+                    // Reset the form
+                    form.reset();
+                    fileInfo.classList.add('hidden');
+                } else {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to generate XML');
+                }
+            } catch (error) {
+                errorMessage.textContent = error.message;
+                errorMessage.classList.remove('hidden');
+            }
+        });
+    </script>
+</body>
+</html>
